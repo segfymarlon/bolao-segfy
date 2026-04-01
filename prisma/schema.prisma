@@ -1,0 +1,287 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  PARTICIPANT
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+}
+
+enum MatchStatus {
+  SCHEDULED
+  LIVE
+  FINISHED
+  POSTPONED
+  CANCELLED
+}
+
+enum StageType {
+  GROUP
+  KNOCKOUT
+}
+
+enum PredictionStatus {
+  OPEN
+  LOCKED
+  SCORED
+}
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id          String    @id @default(cuid())
+  email       String    @unique
+  name        String?
+  role        Role      @default(PARTICIPANT)
+  status      String    @default("active")
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  invitationId String?    @unique
+  invitation   Invitation? @relation(fields: [invitationId], references: [id])
+
+  predictions Prediction[]
+  scoreEvents ScoreEvent[]
+  auditLogs   AuditLog[]   @relation("actorLogs")
+
+  @@map("users")
+}
+
+model Invitation {
+  id         String           @id @default(cuid())
+  email      String           @unique
+  role       Role             @default(PARTICIPANT)
+  status     InvitationStatus @default(PENDING)
+  invitedBy  String
+  invitedAt  DateTime         @default(now())
+  acceptedAt DateTime?
+  revokedAt  DateTime?
+  tokenHash  String?
+
+  user User?
+
+  @@map("invitations")
+}
+
+model AuthToken {
+  id        String    @id @default(cuid())
+  email     String
+  tokenHash String    @unique
+  type      String    // magic_link | otp
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email])
+  @@map("auth_tokens")
+}
+
+// ─── Tournament ───────────────────────────────────────────────────────────────
+
+model Team {
+  id             String  @id @default(cuid())
+  fifaCode       String  @unique
+  name           String
+  groupCode      String?
+  flagUrl        String?
+  isPlaceholder  Boolean @default(false)
+  placeholderKey String?
+
+  homeMatches          Match[]      @relation("homeTeam")
+  awayMatches          Match[]      @relation("awayTeam")
+  qualifiedPredictions Prediction[] @relation("qualifiedPredictions")
+  qualifiedResults     MatchResult[] @relation("qualifiedResults")
+
+  @@map("teams")
+}
+
+model Stage {
+  id           String    @id @default(cuid())
+  code         String    @unique // GROUP | R32 | R16 | QF | SF | THIRD | FINAL
+  name         String
+  orderIndex   Int
+  type         StageType
+  scoringBonus Int       @default(0)
+
+  matches Match[]
+
+  @@map("stages")
+}
+
+model Match {
+  id          String      @id @default(cuid())
+  externalId  String?     @unique
+  stageId     String
+  groupCode   String?
+  matchNumber Int
+  homeTeamId  String?
+  awayTeamId  String?
+  kickoffAt   DateTime
+  venue       String?
+  status      MatchStatus @default(SCHEDULED)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  stage       Stage        @relation(fields: [stageId], references: [id])
+  homeTeam    Team?        @relation("homeTeam", fields: [homeTeamId], references: [id])
+  awayTeam    Team?        @relation("awayTeam", fields: [awayTeamId], references: [id])
+  slots       MatchSlot[]
+  predictions Prediction[]
+  result      MatchResult?
+  scoreEvents ScoreEvent[]
+
+  @@index([kickoffAt])
+  @@index([stageId])
+  @@map("matches")
+}
+
+model MatchSlot {
+  id             String  @id @default(cuid())
+  matchId        String
+  slotType       String  // home | away
+  sourceRule     String  // "1ST_GROUP_A", "BEST_3RD_CDE", etc.
+  resolvedTeamId String?
+
+  match        Match  @relation(fields: [matchId], references: [id])
+
+  @@unique([matchId, slotType])
+  @@map("match_slots")
+}
+
+// ─── Predictions ──────────────────────────────────────────────────────────────
+
+model Prediction {
+  id              String           @id @default(cuid())
+  userId          String
+  matchId         String
+  homeGoalsPred   Int
+  awayGoalsPred   Int
+  qualifiedTeamId String?
+  status          PredictionStatus @default(OPEN)
+  submittedAt     DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  lockedAt        DateTime?
+
+  user          User   @relation(fields: [userId], references: [id])
+  match         Match  @relation(fields: [matchId], references: [id])
+  qualifiedTeam Team?  @relation("qualifiedPredictions", fields: [qualifiedTeamId], references: [id])
+  scoreEvent    ScoreEvent?
+
+  @@unique([userId, matchId])
+  @@index([matchId])
+  @@map("predictions")
+}
+
+// ─── Results ─────────────────────────────────────────────────────────────────
+
+model MatchResult {
+  id              String   @id @default(cuid())
+  matchId         String   @unique
+  homeGoalsFt     Int
+  awayGoalsFt     Int
+  homeGoalsEt     Int?
+  awayGoalsEt     Int?
+  penaltiesHome   Int?
+  penaltiesAway   Int?
+  qualifiedTeamId String?
+  publishedAt     DateTime @default(now())
+  version         Int      @default(1)
+  publishedBy     String
+
+  match         Match  @relation(fields: [matchId], references: [id])
+  qualifiedTeam Team?  @relation("qualifiedResults", fields: [qualifiedTeamId], references: [id])
+
+  @@map("match_results")
+}
+
+// ─── Scoring ─────────────────────────────────────────────────────────────────
+
+model ScoreEvent {
+  id             String   @id @default(cuid())
+  userId         String
+  matchId        String
+  predictionId   String   @unique
+  rulesetVersion Int
+  pointsBase     Int
+  pointsBonus    Int      @default(0)
+  pointsTotal    Int
+  explanationJson Json
+  createdAt      DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id])
+  match      Match      @relation(fields: [matchId], references: [id])
+  prediction Prediction @relation(fields: [predictionId], references: [id])
+
+  @@index([userId])
+  @@index([matchId])
+  @@map("score_events")
+}
+
+// ─── Snapshots ────────────────────────────────────────────────────────────────
+
+model RankingSnapshot {
+  id          String   @id @default(cuid())
+  scope       String   // "global" | "stage:R16" etc.
+  generatedAt DateTime @default(now())
+  payloadJson Json
+
+  @@index([scope, generatedAt])
+  @@map("ranking_snapshots")
+}
+
+model StandingsSnapshot {
+  id          String   @id @default(cuid())
+  groupCode   String
+  generatedAt DateTime @default(now())
+  payloadJson Json
+
+  @@map("standings_snapshots")
+}
+
+// ─── Ruleset ─────────────────────────────────────────────────────────────────
+
+model Ruleset {
+  id            String   @id @default(cuid())
+  version       Int      @unique
+  title         String
+  contentMd     String
+  scoringJson   Json
+  effectiveFrom DateTime
+  isActive      Boolean  @default(false)
+  createdBy     String
+  createdAt     DateTime @default(now())
+
+  @@map("rulesets")
+}
+
+// ─── Audit ────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String
+  beforeJson  Json?
+  afterJson   Json?
+  createdAt   DateTime @default(now())
+
+  actor User? @relation("actorLogs", fields: [actorUserId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
