@@ -316,3 +316,4 @@ ALTER TABLE "score_events" ADD CONSTRAINT "score_events_predictionId_fkey" FOREI
 
 -- AddForeignKey
 ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_actorUserId_fkey" FOREIGN KEY ("actorUserId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
