@@ -96,6 +96,8 @@ export async function GET(req: NextRequest) {
 
   const results: string[] = [];
 
+  try {
+
   // Stages
   for (const stage of STAGES) {
     await prisma.stage.upsert({
@@ -144,4 +146,9 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, results });
+
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+  }
 }
