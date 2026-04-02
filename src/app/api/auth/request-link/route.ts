@@ -33,7 +33,9 @@ export async function POST(req: NextRequest) {
     await sendEmail({ to: emailLower, subject, html });
 
     return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+  } catch (err) {
+    console.error("[request-link] error:", err);
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: "Erro interno", detail: message }, { status: 500 });
   }
 }
