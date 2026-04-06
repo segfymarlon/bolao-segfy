@@ -50,9 +50,15 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const { email, role } = createSchema.parse(body);
-  const invitation = await inviteSingle(email.toLowerCase(), role, admin.id);
-  return NextResponse.json({ invitation }, { status: 201 });
+  try {
+    const { email, role } = createSchema.parse(body);
+    const invitation = await inviteSingle(email.toLowerCase(), role, admin.id);
+    return NextResponse.json({ invitation }, { status: 201 });
+  } catch (err) {
+    console.error("[invitations POST] error:", err);
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
 
 async function inviteSingle(email: string, role: "ADMIN" | "PARTICIPANT", invitedBy: string) {
