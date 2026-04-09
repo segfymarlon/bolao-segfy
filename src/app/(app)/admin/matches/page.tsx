@@ -91,6 +91,18 @@ export default function MatchesAdminPage() {
     setMessage(`Reprocessado: ${data.totalScored} palpites recalculados.`);
   }
 
+  async function handleReset(matchId: string, matchLabel: string) {
+    if (!confirm(`Tem certeza que deseja resetar "${matchLabel}"?\n\nTodos os palpites e pontuações desta partida serão apagados permanentemente.`)) return;
+    const res = await fetch(`/api/admin/matches/${matchId}/reset`, { method: "POST" });
+    const data = await res.json();
+    if (!res.ok) {
+      setMessage(`Erro ao resetar: ${data.error}`);
+    } else {
+      setMessage(`Resetado: ${data.deletedPredictions} palpites e ${data.deletedScoreEvents} pontuações removidos.`);
+      load();
+    }
+  }
+
   const statusColors: Record<string, string> = {
     SCHEDULED: "bg-blue-50 text-blue-700",
     LIVE: "bg-red-50 text-red-700",
@@ -278,6 +290,12 @@ export default function MatchesAdminPage() {
                                 Recalc
                               </button>
                             )}
+                            <button
+                              onClick={() => handleReset(match.id, `${match.homeTeam?.name ?? "?"} × ${match.awayTeam?.name ?? "?"}`)}
+                              className="text-xs text-red-400 hover:text-red-600 hover:underline"
+                            >
+                              Reset
+                            </button>
                           </div>
                         </td>
                       </tr>
