@@ -60,5 +60,25 @@ export async function PATCH(
     return NextResponse.json({ ok: true });
   }
 
+  if (action === "set_role") {
+    const { role } = body;
+    if (role !== "ADMIN" && role !== "PARTICIPANT") {
+      return NextResponse.json({ error: "Role inválido" }, { status: 400 });
+    }
+    await prisma.invitation.update({ where: { id }, data: { role } });
+    const user = await prisma.user.findFirst({ where: { invitationId: id } });
+    if (user) {
+      await prisma.user.update({ where: { id: user.id }, data: { role } });
+    }
+    await createAuditLog({
+      actorUserId: admin.id,
+      action: "USER_ROLE_CHANGED",
+      entityType: "invitation",
+      entityId: id,
+      afterJson: { role },
+    });
+    return NextResponse.json({ ok: true });
+  }
+
   return NextResponse.json({ error: "Ação inválida" }, { status: 400 });
 }

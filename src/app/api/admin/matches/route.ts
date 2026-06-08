@@ -64,3 +64,26 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ match }, { status: 201 });
 }
+
+export async function DELETE() {
+  const admin = await requireAdmin().catch(() => null);
+  if (!admin) return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+
+  const { count } = await prisma.$transaction(async (tx) => {
+    await tx.scoreEvent.deleteMany({});
+    await tx.prediction.deleteMany({});
+    await tx.matchResult.deleteMany({});
+    const { count } = await tx.match.deleteMany({});
+    return { count };
+  });
+
+  await createAuditLog({
+    actorUserId: admin.id,
+    action: "MATCHES_DELETED_ALL",
+    entityType: "match",
+    entityId: "all",
+    afterJson: { deletedCount: count },
+  });
+
+  return NextResponse.json({ ok: true, deletedCount: count });
+}

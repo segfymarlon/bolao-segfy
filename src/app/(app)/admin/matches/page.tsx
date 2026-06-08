@@ -78,6 +78,7 @@ export default function MatchesAdminPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState<CreateForm>(EMPTY_CREATE);
   const [submittingCreate, setSubmittingCreate] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
 
   function notify(msg: string, type: "ok" | "err" = "ok") {
     setMessage(msg);
@@ -167,6 +168,20 @@ export default function MatchesAdminPage() {
     }
   }
 
+  async function handleDeleteAll() {
+    if (!confirm(`Excluir TODAS as partidas?\n\nIsso apagará permanentemente todas as partidas, palpites e pontuações do banco. Esta ação não pode ser desfeita.`)) return;
+    setDeletingAll(true);
+    const res = await fetch("/api/admin/matches", { method: "DELETE" });
+    const data = await res.json();
+    if (!res.ok) {
+      notify(data.error ?? "Erro ao excluir", "err");
+    } else {
+      notify(`${data.deletedCount} partida(s) excluída(s) com sucesso.`);
+      load();
+    }
+    setDeletingAll(false);
+  }
+
   async function handleCreate() {
     if (!createForm.stageId || !createForm.kickoffAt || !createForm.matchNumber) return;
     setSubmittingCreate(true);
@@ -226,6 +241,13 @@ export default function MatchesAdminPage() {
               {message}
             </p>
           )}
+          <button
+            onClick={handleDeleteAll}
+            disabled={deletingAll || matches.length === 0}
+            className="text-sm px-4 py-2 rounded-lg font-medium border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-40 transition-colors"
+          >
+            {deletingAll ? "Excluindo..." : "Excluir Todas"}
+          </button>
           <button
             onClick={() => { setShowCreate(true); setCreateForm(EMPTY_CREATE); }}
             className="bg-green-600 text-white text-sm px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors"

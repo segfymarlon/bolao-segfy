@@ -58,15 +58,23 @@ export default function InvitationsPage() {
     }
   }
 
-  async function handleAction(id: string, action: "revoke" | "resend") {
+  async function handleAction(id: string, action: "revoke" | "resend" | "set_role", extra?: object) {
     const res = await fetch(`/api/admin/invitations/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({ action, ...extra }),
     });
+    const data = await res.json();
     if (res.ok) {
-      setMessage(action === "revoke" ? "Convite revogado." : "Convite reenviado.");
+      const msgs: Record<string, string> = {
+        revoke: "Convite revogado.",
+        resend: "Convite reenviado.",
+        set_role: "Função atualizada.",
+      };
+      setMessage(msgs[action] ?? "Feito.");
       load();
+    } else {
+      setMessage(data.error ?? "Erro.");
     }
   }
 
@@ -140,6 +148,7 @@ export default function InvitationsPage() {
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">E-mail</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden sm:table-cell">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden sm:table-cell">Função</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Convidado em</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Último acesso</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Ações</th>
@@ -154,6 +163,14 @@ export default function InvitationsPage() {
                       {getInvitationStatusLabel(inv.status)}
                     </span>
                   </td>
+                  <td className="px-4 py-3 hidden sm:table-cell">
+                    <span className={cn(
+                      "text-xs px-2 py-0.5 rounded-full font-medium",
+                      inv.role === "ADMIN" ? "bg-purple-50 text-purple-700" : "bg-gray-100 text-gray-600"
+                    )}>
+                      {inv.role === "ADMIN" ? "Admin" : "Participante"}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-gray-500 text-xs hidden md:table-cell">
                     {new Date(inv.invitedAt).toLocaleDateString("pt-BR")}
                   </td>
@@ -164,6 +181,19 @@ export default function InvitationsPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
+                      {inv.status !== "REVOKED" && (
+                        <button
+                          onClick={() => handleAction(inv.id, "set_role", {
+                            role: inv.role === "ADMIN" ? "PARTICIPANT" : "ADMIN",
+                          })}
+                          className={cn(
+                            "text-xs hover:underline",
+                            inv.role === "ADMIN" ? "text-gray-500" : "text-purple-600"
+                          )}
+                        >
+                          {inv.role === "ADMIN" ? "Remover Admin" : "Tornar Admin"}
+                        </button>
+                      )}
                       {inv.status !== "REVOKED" && (
                         <button
                           onClick={() => handleAction(inv.id, "resend")}
