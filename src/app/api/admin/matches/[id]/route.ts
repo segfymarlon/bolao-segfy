@@ -46,3 +46,40 @@ export async function PATCH(
 
   return NextResponse.json({ match });
 }
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const admin = await requireAdmin().catch(() => null);
+  if (!admin) return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+
+  const { id } = await params;
+
+  const existing = await prisma.match.findUnique({ where: { id } });
+  if (!existing) return NextResponse.json({ error: "Partida não encontrada" }, { status: 404 });
+
+  const predCount = await prisma.prediction.count({ where: { matchId: id } });
+  if (predCount > 0) {
+    return NextResponse.json(
+      { error: `Não é possível excluir: há ${predCount} palpite(s) registrado(s). Use Reset primeiro.` },
+      { status: 409 }
+    );
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.scoreEvent.deleteMany({ where: { matchId: id } });
+    await tx.matchResult.deleteMany({ where: { matchId: id } });
+    await tx.match.delete({ where: { id } });
+  });
+
+  await createAuditLog({
+    actorUserId: admin.id,
+    action: "MATCH_DELETED",
+    entityType: "match",
+    entityId: id,
+    beforeJson: existing,
+  });
+
+  return NextResponse.json({ ok: true });
+}
