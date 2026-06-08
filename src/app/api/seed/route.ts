@@ -23,7 +23,7 @@ const GROUPS: Record<string, { code: string; name: string }[]> = {
     { code: "BRA", name: "Brasil" },
     { code: "COL", name: "Colômbia" },
     { code: "URU", name: "Uruguai" },
-    { code: "PAR", name: "Paraguai" },
+    { code: "HAI", name: "Haiti" },
   ],
   C: [
     { code: "FRA", name: "França" },

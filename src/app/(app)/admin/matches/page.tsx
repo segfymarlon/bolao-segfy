@@ -98,7 +98,8 @@ export default function MatchesAdminPage() {
     ]);
     setMatches(matchData.matches ?? []);
     setStages(stageData.stages ?? []);
-    setTeams(teamData.teams ?? []);
+    const raw: Team[] = teamData.teams ?? [];
+    setTeams([...raw].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")));
     setLoading(false);
   }
 
