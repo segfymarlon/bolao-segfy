@@ -7,6 +7,7 @@ const adminNav = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/invitations", label: "Convites" },
   { href: "/admin/matches", label: "Partidas" },
+  { href: "/admin/teams", label: "Seleções" },
   { href: "/admin/ruleset", label: "Regulamento" },
   { href: "/admin/audit", label: "Auditoria" },
 ];
